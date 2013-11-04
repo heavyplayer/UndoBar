@@ -22,7 +22,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Parcelable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -30,10 +29,8 @@ import android.view.animation.Animation;
 import android.view.animation.AnticipateOvershootInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.view.animation.TranslateAnimation;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-
 import com.cocosw.undobar.R.drawable;
 import com.cocosw.undobar.R.id;
 import com.cocosw.undobar.R.string;
@@ -156,6 +153,13 @@ public class UndoBarController extends LinearLayout {
                 mButton.setText(style.titleRes);
                 mButton.setCompoundDrawablesWithIntrinsicBounds(getResources()
 						.getDrawable(style.iconRes), null, null, null);
+
+				// Change button background, but preserve the padding.
+				final int paddingLeft, paddingRight;
+				paddingLeft = mButton.getPaddingLeft();
+				paddingRight = mButton.getPaddingRight();
+				mButton.setBackgroundResource(style.buttonBgRes);
+				mButton.setPadding(paddingLeft, 0, paddingRight, 0);
 			} else {
                 mButton.setVisibility(View.GONE);
 				findViewById(id.undobar_divider).setVisibility(View.GONE);
