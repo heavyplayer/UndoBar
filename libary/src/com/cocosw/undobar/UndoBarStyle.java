@@ -1,14 +1,17 @@
 package com.cocosw.undobar;
 
+import android.os.Parcel;
+import android.os.Parcelable;
 import com.cocosw.undobar.R.drawable;
 
-public class UndoBarStyle {
+public class UndoBarStyle implements Parcelable {
+	public static final int DEFAULT_DURATION = 5000;
 
 	int iconRes;
 	int titleRes;
 	int buttonBgRes = drawable.undobar_button;
 	int bgRes = drawable.undobar;
-	long duration = 5000;
+	long duration = DEFAULT_DURATION;
 
 	public UndoBarStyle(final int icon, final int title) {
 		iconRes = icon;
@@ -40,4 +43,55 @@ public class UndoBarStyle {
                 ", duration=" + duration +
                 '}';
     }
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+
+		UndoBarStyle that = (UndoBarStyle) o;
+
+		return bgRes == that.bgRes &&
+				buttonBgRes == that.buttonBgRes &&
+				duration == that.duration &&
+				iconRes == that.iconRes &&
+				titleRes == that.titleRes;
+
+	}
+
+	/*
+	 * Parcelable-related methods.
+	 */
+
+	public UndoBarStyle(Parcel source) {
+		iconRes = source.readInt();
+		titleRes = source.readInt();
+		buttonBgRes = source.readInt();
+		bgRes = source.readInt();
+		duration = source.readLong();
+	}
+
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeInt(iconRes);
+		dest.writeInt(titleRes);
+		dest.writeInt(buttonBgRes);
+		dest.writeInt(bgRes);
+		dest.writeLong(duration);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	public static final Parcelable.Creator<UndoBarStyle> CREATOR = new Parcelable.Creator<UndoBarStyle>() {
+		public UndoBarStyle createFromParcel(Parcel source) {
+			return new UndoBarStyle(source);
+		}
+
+		public UndoBarStyle[] newArray(int size) {
+			return new UndoBarStyle[size];
+		}
+	};
 }
