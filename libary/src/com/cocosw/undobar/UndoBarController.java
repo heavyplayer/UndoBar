@@ -24,6 +24,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
@@ -54,7 +55,12 @@ public class UndoBarController extends FrameLayout {
 	private UndoListener mUndoListener;
 	private UndoBarStyle mStyle;
 
+	private boolean mImmediate = false;
+	private boolean mDismissOnOutsideTouch = false;
 	private Parcelable mUndoToken;
+
+	// Used to control whether touches were in or out the undo bar.
+	private boolean mDispatchedTouchEvent = false;
 
 	private final Handler mHideHandler = new Handler();
 	private final Runnable mHideRunnable = new Runnable() {
@@ -121,31 +127,8 @@ public class UndoBarController extends FrameLayout {
 		return mUndoListener;
 	}
 
-	private void hideUndoBar(final boolean immediate) {
-		mHideHandler.removeCallbacks(mHideRunnable);
-		mUndoToken = null;
-		if (immediate) {
-			setVisibility(View.GONE);
-		} else {
-			clearAnimation();
-			startAnimation(UndoBarController.outToBottomAnimation(null));
-			setVisibility(View.GONE);
-		}
-	}
-
-	private static Animation outToBottomAnimation(
-			final android.view.animation.Animation.AnimationListener animationlistener) {
-		final TranslateAnimation translateanimation = new TranslateAnimation(2,
-				0F, 2, 0F, 2, 0F, 2, 1F);
-		translateanimation.setDuration(500L);
-		translateanimation.setInterpolator(new AnticipateOvershootInterpolator(
-				1.0f));
-		translateanimation.setAnimationListener(animationlistener);
-		return translateanimation;
-	}
-
-	protected void showUndoBar(final boolean immediate,
-			final CharSequence message, final Parcelable undoToken) {
+	protected void showUndoBar(final boolean immediate, final boolean dismissOnOutsideTouch, final CharSequence message,
+	                           final Parcelable undoToken) {
 		mUndoToken = undoToken;
 		mMessageView.setText(message);
 
@@ -153,11 +136,14 @@ public class UndoBarController extends FrameLayout {
 		if(mStyle.duration > 0)
 			mHideHandler.postDelayed(mHideRunnable, mStyle != null ? mStyle.duration : UndoBarStyle.DEFAULT_DURATION);
 
-		if (!immediate) {
+		if(!immediate) {
 			clearAnimation();
 			startAnimation(UndoBarController.inFromBottomAnimation(null));
 		}
 		setVisibility(View.VISIBLE);
+
+		mImmediate = immediate;
+		mDismissOnOutsideTouch = dismissOnOutsideTouch;
 	}
 
 	private static Animation inFromBottomAnimation(
@@ -170,11 +156,106 @@ public class UndoBarController extends FrameLayout {
 		return translateanimation;
 	}
 
+	private void hideUndoBar(final boolean immediate) {
+		mHideHandler.removeCallbacks(mHideRunnable);
+		mUndoToken = null;
+		if (immediate) {
+			setVisibility(View.GONE);
+		} else {
+			clearAnimation();
+			startAnimation(UndoBarController.outToBottomAnimation(null));
+			setVisibility(View.GONE);
+		}
+	}
+
+	private static Animation outToBottomAnimation(final android.view.animation.Animation.AnimationListener animationlistener) {
+		final TranslateAnimation translateanimation = new TranslateAnimation(2,
+				0F, 2, 0F, 2, 0F, 2, 1F);
+		translateanimation.setDuration(500L);
+		translateanimation.setInterpolator(new AnticipateOvershootInterpolator(
+				1.0f));
+		translateanimation.setAnimationListener(animationlistener);
+		return translateanimation;
+	}
+
+	@Override
+	protected void onAttachedToWindow() {
+		ensureOutsideTouchLayout();
+		super.onAttachedToWindow();
+	}
+
+	private void ensureOutsideTouchLayout() {
+		final ViewGroup rootView = (ViewGroup)getRootView();
+		if(rootView != null && rootView.findViewById(R.id._undobar_outside_touch_layout) == null) {
+			// Inject the outside touch layout, if it is not already present.
+
+			// Initialize outside touch layout.
+			final ViewGroup outsideTouchLayout = new DismissOnOutsideTouchFrameLayout(getContext());
+
+			final int rootCount = rootView.getChildCount();
+			for(int i = 0; i < rootCount; i++) {
+				final View child = rootView.getChildAt(i);
+				if(child != null) {
+					rootView.removeViewAt(i);
+
+					outsideTouchLayout.addView(child);
+				}
+			}
+
+			rootView.addView(outsideTouchLayout);
+		}
+	}
+
+	private class DismissOnOutsideTouchFrameLayout extends FrameLayout {
+		public DismissOnOutsideTouchFrameLayout(Context context) {
+			super(context);
+			setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+			setId(R.id._undobar_outside_touch_layout);
+		}
+
+		@Override
+		public boolean dispatchTouchEvent(MotionEvent ev) {
+			if(mDismissOnOutsideTouch) {
+				final int action = ev.getAction();
+				if(action == MotionEvent.ACTION_DOWN) {
+					if(UndoBarController.this.getVisibility() == View.VISIBLE) {
+						// We clear the controller's flag for dispatched touch events.
+						mDispatchedTouchEvent = false;
+						final boolean dispatched = super.dispatchTouchEvent(ev);
+
+						// After dispatching all touches, if the undo bar didn't dispatch any events,
+						// it means the motion event was actually outside of the undo bar.
+						if(!mDispatchedTouchEvent) {
+							mDismissOnOutsideTouch = false; // Stop dismissing, since we are hiding the undo bar.
+							hide((ViewGroup)getRootView(), mImmediate);
+						}
+
+						return dispatched;
+					}
+					else {
+						// Stop dismissing, since the undo bar is already hidden.
+						mDismissOnOutsideTouch = false;
+					}
+				}
+			}
+
+			return super.dispatchTouchEvent(ev);
+		}
+	}
+
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent ev) {
+		mDispatchedTouchEvent = super.dispatchTouchEvent(ev);
+		return mDispatchedTouchEvent;
+	}
+
 	@Override
 	public Parcelable onSaveInstanceState() {
 		SavedState ss = new SavedState(super.onSaveInstanceState());
 		// Save visibility, token and style.
 		ss.visibility = getVisibility();
+		ss.immediate = mImmediate;
+		ss.dismissOnOutsideTouch = mDismissOnOutsideTouch;
 		ss.bundle = new Bundle();
 		ss.bundle.putParcelable(STYLE_TAG, mStyle);
 		ss.bundle.putParcelable(UNDO_TOKEN_TAG, mUndoToken);
@@ -196,6 +277,10 @@ public class UndoBarController extends FrameLayout {
 		if(getVisibility() != ss.visibility)
 			setVisibility(ss.visibility);
 
+		// Restore dismiss variables.
+		mImmediate = ss.immediate;
+		mDismissOnOutsideTouch = ss.dismissOnOutsideTouch;
+
 		// Restore style.
 		setStyle(ss.bundle.<UndoBarStyle>getParcelable(STYLE_TAG));
 
@@ -205,6 +290,8 @@ public class UndoBarController extends FrameLayout {
 
 	static class SavedState extends BaseSavedState {
 		int visibility;
+		boolean immediate;
+		boolean dismissOnOutsideTouch;
 		Bundle bundle;
 
 		public SavedState(Parcelable superState) {
@@ -215,12 +302,16 @@ public class UndoBarController extends FrameLayout {
 		public void writeToParcel(Parcel dest, int flags) {
 			super.writeToParcel(dest, flags);
 			dest.writeInt(visibility);
+			dest.writeInt(immediate ? 1 : 0);
+			dest.writeInt(dismissOnOutsideTouch ? 1 : 0);
 			dest.writeBundle(bundle);
 		}
 
 		private SavedState(Parcel source) {
 			super(source);
 			visibility = source.readInt();
+			immediate = source.readInt() == 1;
+			dismissOnOutsideTouch = source.readInt() == 1;
 			bundle = source.readBundle();
 		}
 
@@ -242,14 +333,14 @@ public class UndoBarController extends FrameLayout {
 	 * Usually called inside Activity's onCreate() method.
 	 *
 	 * @param activity Activity to hold this view.
-	 * @param listener Callback listener triggered after click undobar.
+	 * @param listener Callback listener triggered after click undo bar.
 	 * @param style {@link UndoBarStyle}
 	 *
 	 * @return the created/configured UndoBarController.
 	 */
-	public static UndoBarController setup(final Activity activity, final UndoBarStyle style, final UndoListener listener) {
+	public static UndoBarController setup(final Activity activity, final UndoBarStyle style,
+	                                      final UndoListener listener) {
 		return setup(ensureView(activity), style, listener);
-
 	}
 
 	/**
@@ -258,15 +349,15 @@ public class UndoBarController extends FrameLayout {
 	 * If you want to setup it inside a fragment, make sure you call this inside onCreateView() method
 	 * using the view that was created, in order to properly save and restore instance state.
 	 *
-	 * @param group The group that will contain the UndoBar.
-	 * @param listener Callback listener triggered after click undobar.
+	 * @param container The group that will contain the UndoBar.
+	 * @param listener Callback listener triggered after click undo bar.
 	 * @param style {@link UndoBarStyle}
 	 *
 	 * @return the created/configured UndoBarController.
 	 */
-	public static UndoBarController setup(final ViewGroup group, final UndoBarStyle style,
+	public static UndoBarController setup(final ViewGroup container, final UndoBarStyle style,
 	                                      final UndoListener listener) {
-		return setup(ensureView(group), style, listener);
+		return setup(ensureView(container), style, listener);
 	}
 
 	/**
@@ -279,20 +370,37 @@ public class UndoBarController extends FrameLayout {
 		return undo;
 	}
 
+	private static UndoBarController ensureView(final Activity activity) {
+		final ViewGroup decorView = (ViewGroup)activity.getWindow().getDecorView();
+		final ViewGroup contentView = (ViewGroup)decorView.findViewById(android.R.id.content);
+		// Try to inject the view in the activity's content view. Otherwise, inject it directly in the decor view.
+		return ensureView(contentView != null ? contentView : decorView);
+	}
+	private static UndoBarController ensureView(final ViewGroup container) {
+		UndoBarController undo = (UndoBarController)container.findViewById(R.id._undobar_controller);
+		if(undo == null) {
+			// Create the undo bar controller as it doesn't already exist.
+			undo = new UndoBarController(container.getContext(), null);
+			container.addView(undo);
+		}
+		return undo;
+	}
+
 	/**
 	 * Quick method to show a UndoBar into an Activity.
 	 *
 	 * @param activity Activity to hold this view.
-	 * @param message The message will be shown in left side in undobar.
+	 * @param message The message will be shown in left side in undo bar.
+	 * @param immediate Show undo bar immediately or show it with animation.
+	 * @param dismissOnOutsideTouch Dismiss undo bar if user clicks outside of it.
 	 * @param undoToken Token info,will pass to callback to help you to undo.
-	 * @param immediate Show undobar immediately or show it with animation.
 	 *
 	 * @return the shown UndoBarController.
 	 */
-	public static UndoBarController show(final Activity activity, final CharSequence message,
-	                                     final boolean immediate, final Parcelable undoToken) {
+	public static UndoBarController show(final Activity activity, final CharSequence message, final boolean immediate,
+	                                     final boolean dismissOnOutsideTouch, final Parcelable undoToken) {
 		final UndoBarController undo = UndoBarController.ensureView(activity);
-		undo.showUndoBar(immediate, message, undoToken);
+		undo.showUndoBar(immediate, dismissOnOutsideTouch, message, undoToken);
 		return undo;
 	}
 
@@ -300,49 +408,28 @@ public class UndoBarController extends FrameLayout {
 	 * Quick method to show a UndoBar inside a ViewGroup.
 	 * Use this method if you want to show it inside a Fragment's view.
 	 *
-	 * @param group The group that will contain the UndoBar.
-	 * @param message The message will be shown in left side in undobar.
+	 * @param container The ViewGroup that will contain the UndoBar.
+	 * @param message The message will be shown in left side in undo bar.
+	 * @param immediate Show undo bar immediately or show it with animation.
+	 * @param dismissOnOutsideTouch Dismiss undo bar if user clicks outside of it.
 	 * @param undoToken Token info,will pass to callback to help you to undo.
-	 * @param immediate Show undobar immediately or show it with animation.
 	 *
 	 * @return the shown UndoBarController.
 	 */
-	public static UndoBarController show(final ViewGroup group, final CharSequence message,
-	                                     final boolean immediate, final Parcelable undoToken) {
-		final UndoBarController undo = UndoBarController.ensureView(group);
-		undo.showUndoBar(immediate, message, undoToken);
+	public static UndoBarController show(final ViewGroup container, final CharSequence message, final boolean immediate,
+	                                     final boolean dismissOnOutsideTouch, final Parcelable undoToken) {
+		final UndoBarController undo = UndoBarController.ensureView(container);
+		undo.showUndoBar(immediate, dismissOnOutsideTouch, message, undoToken);
 		return undo;
 	}
 
-	private static UndoBarController ensureView(final Activity activity) {
-		final ViewGroup decorView = (ViewGroup)activity.getWindow().getDecorView();
-		final ViewGroup contentView = (ViewGroup)decorView.findViewById(android.R.id.content);
-		return ensureView(decorView, contentView);
+	public static void hide(final Activity activity, final boolean immediate) {
+		hide((ViewGroup)activity.getWindow().getDecorView(), immediate);
 	}
-	private static UndoBarController ensureView(final ViewGroup view) {
-		return ensureView(view, view);
-	}
-
-	/**
-	 * If the view doesn't exist in the root view, add it to the container view.
-	 */
-	private static UndoBarController ensureView(final ViewGroup root, final ViewGroup container) {
-		UndoBarController undo = (UndoBarController)root.findViewById(R.id._undobar_controller);
-		if(undo == null) {
-			// Create the undobar controller as it doesn't already exist.
-			undo = new UndoBarController(root.getContext(), null);
-			container.addView(undo);
-		}
-		return undo;
-	}
-
-	/**
-	 * Hide the UndoBar immediately.
-	 */
-	public static void hide(final Activity activity) {
-		final UndoBarController undo = (UndoBarController)activity.findViewById(R.id._undobar_controller);
+	public static void hide(final ViewGroup container, final boolean immediate) {
+		final UndoBarController undo = (UndoBarController)container.findViewById(R.id._undobar_controller);
 		if (undo != null) {
-			undo.setVisibility(View.GONE);
+			undo.hideUndoBar(immediate);
 		}
 	}
 }
