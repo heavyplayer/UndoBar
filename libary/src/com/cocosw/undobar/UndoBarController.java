@@ -18,7 +18,6 @@ package com.cocosw.undobar;
 
 import android.app.Activity;
 import android.content.Context;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -35,9 +34,6 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 public class UndoBarController extends FrameLayout {
-	private static final String UNDO_TOKEN_TAG = ":undo_token";
-	private static final String STYLE_TAG = ":style";
-
 	/*
 	 * Default UndoBar styles.
 	 */
@@ -256,9 +252,8 @@ public class UndoBarController extends FrameLayout {
 		ss.visibility = getVisibility();
 		ss.immediate = mImmediate;
 		ss.dismissOnOutsideTouch = mDismissOnOutsideTouch;
-		ss.bundle = new Bundle();
-		ss.bundle.putParcelable(STYLE_TAG, mStyle);
-		ss.bundle.putParcelable(UNDO_TOKEN_TAG, mUndoToken);
+		ss.style = mStyle;
+		ss.token = mUndoToken;
 
 		return ss;
 	}
@@ -282,17 +277,18 @@ public class UndoBarController extends FrameLayout {
 		mDismissOnOutsideTouch = ss.dismissOnOutsideTouch;
 
 		// Restore style.
-		setStyle(ss.bundle.<UndoBarStyle>getParcelable(STYLE_TAG));
+		setStyle(ss.style);
 
 		// Restore token.
-		mUndoToken = ss.bundle.getParcelable(UNDO_TOKEN_TAG);
+		mUndoToken = ss.token;
 	}
 
 	static class SavedState extends BaseSavedState {
 		int visibility;
 		boolean immediate;
 		boolean dismissOnOutsideTouch;
-		Bundle bundle;
+		UndoBarStyle style;
+		Parcelable token;
 
 		public SavedState(Parcelable superState) {
 			super(superState);
@@ -304,7 +300,9 @@ public class UndoBarController extends FrameLayout {
 			dest.writeInt(visibility);
 			dest.writeInt(immediate ? 1 : 0);
 			dest.writeInt(dismissOnOutsideTouch ? 1 : 0);
-			dest.writeBundle(bundle);
+			dest.writeParcelable(style, 0);
+			dest.writeString(token.getClass().getName());
+			dest.writeParcelable(token, 0);
 		}
 
 		private SavedState(Parcel source) {
@@ -312,7 +310,12 @@ public class UndoBarController extends FrameLayout {
 			visibility = source.readInt();
 			immediate = source.readInt() == 1;
 			dismissOnOutsideTouch = source.readInt() == 1;
-			bundle = source.readBundle();
+			style = source.readParcelable(UndoBarStyle.class.getClassLoader());
+			try {
+				token = source.readParcelable(Class.forName(source.readString()).getClassLoader());
+			} catch (ClassNotFoundException e) {
+				throw new IllegalStateException("Undo token class not found.");
+			}
 		}
 
 		public static final Parcelable.Creator<SavedState> CREATOR = new Parcelable.Creator<SavedState>() {
