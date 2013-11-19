@@ -27,9 +27,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
-import android.view.animation.AnticipateOvershootInterpolator;
-import android.view.animation.OvershootInterpolator;
-import android.view.animation.TranslateAnimation;
+import android.view.animation.AnimationUtils;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
@@ -50,6 +48,9 @@ public class UndoBarController extends FrameLayout {
 
 	private UndoListener mUndoListener;
 	private UndoBarStyle mStyle;
+
+	private Animation mFadeInAnimation;
+	private Animation mFadeOutAnimation;
 
 	private boolean mImmediate = false;
 	private boolean mDismissOnOutsideTouch = false;
@@ -132,9 +133,11 @@ public class UndoBarController extends FrameLayout {
 		if(mStyle.duration > 0)
 			mHideHandler.postDelayed(mHideRunnable, mStyle != null ? mStyle.duration : UndoBarStyle.DEFAULT_DURATION);
 
-		if(!immediate) {
+		final Animation showAnimation;
+		if(!immediate &&
+			(showAnimation = onCreateShowAnimation()) != null) {
 			clearAnimation();
-			startAnimation(UndoBarController.inFromBottomAnimation(null));
+			startAnimation(showAnimation);
 		}
 		setVisibility(View.VISIBLE);
 
@@ -142,36 +145,37 @@ public class UndoBarController extends FrameLayout {
 		mDismissOnOutsideTouch = dismissOnOutsideTouch;
 	}
 
-	private static Animation inFromBottomAnimation(
-			final android.view.animation.Animation.AnimationListener animationlistener) {
-		final TranslateAnimation translateanimation = new TranslateAnimation(2,
-				0F, 2, 0F, 2, 1F, 2, 0F);
-		translateanimation.setDuration(500L);
-		translateanimation.setInterpolator(new OvershootInterpolator(1.0f));
-		translateanimation.setAnimationListener(animationlistener);
-		return translateanimation;
+	protected Animation onCreateShowAnimation() {
+		if(mFadeInAnimation == null) {
+			final Context context = getContext();
+			mFadeInAnimation = context != null ?
+					AnimationUtils.loadAnimation(getContext(), android.R.anim.fade_in) :
+					null;
+		}
+		return mFadeInAnimation;
 	}
 
 	private void hideUndoBar(final boolean immediate) {
 		mHideHandler.removeCallbacks(mHideRunnable);
 		mUndoToken = null;
-		if (immediate) {
-			setVisibility(View.GONE);
-		} else {
+
+		final Animation hideAnimation;
+		if(!immediate &&
+			(hideAnimation = onCreateHideAnimation()) != null) {
 			clearAnimation();
-			startAnimation(UndoBarController.outToBottomAnimation(null));
-			setVisibility(View.GONE);
+			startAnimation(hideAnimation);
 		}
+		setVisibility(View.GONE);
 	}
 
-	private static Animation outToBottomAnimation(final android.view.animation.Animation.AnimationListener animationlistener) {
-		final TranslateAnimation translateanimation = new TranslateAnimation(2,
-				0F, 2, 0F, 2, 0F, 2, 1F);
-		translateanimation.setDuration(500L);
-		translateanimation.setInterpolator(new AnticipateOvershootInterpolator(
-				1.0f));
-		translateanimation.setAnimationListener(animationlistener);
-		return translateanimation;
+	protected Animation onCreateHideAnimation() {
+		if(mFadeOutAnimation == null) {
+			final Context context = getContext();
+			mFadeOutAnimation = context != null ?
+					AnimationUtils.loadAnimation(getContext(), android.R.anim.fade_out) :
+					null;
+		}
+		return mFadeOutAnimation;
 	}
 
 	@Override
