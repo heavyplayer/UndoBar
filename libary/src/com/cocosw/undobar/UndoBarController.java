@@ -305,8 +305,14 @@ public class UndoBarController extends FrameLayout {
 			dest.writeInt(immediate ? 1 : 0);
 			dest.writeInt(dismissOnOutsideTouch ? 1 : 0);
 			dest.writeParcelable(style, 0);
-			dest.writeString(token.getClass().getName());
-			dest.writeParcelable(token, 0);
+
+			// Marshall token.
+			final boolean hasToken = token != null;
+			dest.writeInt(hasToken ? 1 : 0);
+			if(hasToken) {
+				dest.writeString(token.getClass().getName());
+				dest.writeParcelable(token, 0);
+			}
 		}
 
 		private SavedState(Parcel source) {
@@ -315,10 +321,15 @@ public class UndoBarController extends FrameLayout {
 			immediate = source.readInt() == 1;
 			dismissOnOutsideTouch = source.readInt() == 1;
 			style = source.readParcelable(UndoBarStyle.class.getClassLoader());
-			try {
-				token = source.readParcelable(Class.forName(source.readString()).getClassLoader());
-			} catch (ClassNotFoundException e) {
-				throw new IllegalStateException("Undo token class not found.");
+
+			// Unmarshall token.
+			final boolean hasToken = source.readInt() == 1;
+			if(hasToken) {
+				try {
+					token = source.readParcelable(Class.forName(source.readString()).getClassLoader());
+				} catch (ClassNotFoundException e) {
+					throw new IllegalStateException("Undo token class not found.");
+				}
 			}
 		}
 
