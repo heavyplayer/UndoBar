@@ -134,10 +134,6 @@ public class UndoBarController extends FrameLayout {
 		mUndoToken = undoToken;
 		mMessageView.setText(message);
 
-		mHideHandler.removeCallbacks(mHideRunnable);
-		if(mStyle.duration > 0)
-			mHideHandler.postDelayed(mHideRunnable, mStyle != null ? mStyle.duration : UndoBarStyle.DEFAULT_DURATION);
-
 		final Animation showAnimation;
 		if(!immediate &&
 			(showAnimation = onCreateShowAnimation()) != null) {
@@ -148,6 +144,15 @@ public class UndoBarController extends FrameLayout {
 
 		mImmediate = immediate;
 		mDismissOnOutsideTouch = dismissOnOutsideTouch;
+
+		// Schedule hide.
+		scheduleHide();
+	}
+
+	private void scheduleHide() {
+		mHideHandler.removeCallbacks(mHideRunnable);
+		if(mStyle.duration > 0)
+			mHideHandler.postDelayed(mHideRunnable, mStyle != null ? mStyle.duration : UndoBarStyle.DEFAULT_DURATION);
 	}
 
 	protected Animation onCreateShowAnimation() {
@@ -287,6 +292,10 @@ public class UndoBarController extends FrameLayout {
 
 		// Restore style.
 		setStyle(ss.style);
+		// If we are restoring the undo bar, we will make sure
+		// it still disappears if the duration is set.
+		if(ss.visibility == View.VISIBLE)
+			scheduleHide();
 
 		// Restore token.
 		mUndoToken = ss.token;
