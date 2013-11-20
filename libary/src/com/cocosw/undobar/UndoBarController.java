@@ -94,10 +94,12 @@ public class UndoBarController extends FrameLayout {
 		if(style != null && !style.equals(mStyle)) {
 			mStyle = style;
 
-			if(mStyle.titleRes > 0) {
+			final String buttonText;
+			if(mStyle.titleRes > 0 &&
+				(buttonText = getResources().getString(mStyle.titleRes)) != null) {
+
 				mButton.setVisibility(View.VISIBLE);
-				findViewById(R.id.undobar_divider).setVisibility(View.VISIBLE);
-				mButton.setText(mStyle.titleRes);
+				mButton.setText(buttonText.toUpperCase());
 				mButton.setCompoundDrawablesWithIntrinsicBounds(getResources()
 						.getDrawable(mStyle.iconRes), null, null, null);
 
@@ -107,6 +109,9 @@ public class UndoBarController extends FrameLayout {
 				paddingRight = mButton.getPaddingRight();
 				mButton.setBackgroundResource(mStyle.buttonBgRes);
 				mButton.setPadding(paddingLeft, 0, paddingRight, 0);
+
+				// Show divider.
+				findViewById(R.id.undobar_divider).setVisibility(View.VISIBLE);
 			}
 			else {
 				mButton.setVisibility(View.GONE);
