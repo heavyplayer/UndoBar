@@ -151,7 +151,7 @@ public class UndoBarController extends FrameLayout {
 
 	private void scheduleHide() {
 		mHideHandler.removeCallbacks(mHideRunnable);
-		if(mStyle.duration > 0)
+		if(mStyle != null && mStyle.duration > 0)
 			mHideHandler.postDelayed(mHideRunnable, mStyle != null ? mStyle.duration : UndoBarStyle.DEFAULT_DURATION);
 	}
 
