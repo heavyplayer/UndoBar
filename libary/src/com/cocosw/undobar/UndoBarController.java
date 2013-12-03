@@ -43,18 +43,19 @@ public class UndoBarController extends FrameLayout {
 		void onUndo(Parcelable token);
 	}
 
-	private final TextView mMessageView;
-    private final TextView mButton;
+	protected TextView mMessageView;
+	protected TextView mButton;
 
-	private UndoListener mUndoListener;
-	private UndoBarStyle mStyle;
+	protected UndoListener mUndoListener;
+	protected UndoBarStyle mStyle;
+
+	protected Parcelable mUndoToken;
 
 	private Animation mFadeInAnimation;
 	private Animation mFadeOutAnimation;
 
 	private boolean mImmediate = false;
 	private boolean mDismissOnOutsideTouch = false;
-	private Parcelable mUndoToken;
 
 	// Used to control whether touches were in or out the undo bar.
 	private boolean mDispatchedTouchEvent = false;
@@ -72,22 +73,26 @@ public class UndoBarController extends FrameLayout {
 		// Important to find it in the view tree and to save and restore instance state.
 		setId(R.id._undobar_controller);
 
-		LayoutInflater.from(context).inflate(R.layout.undobar, this, true);
-		mMessageView = (TextView) findViewById(R.id.undobar_message);
-        mButton = (TextView) findViewById(R.id.undobar_button);
-        mButton.setOnClickListener(
-		        new View.OnClickListener() {
-			        @Override
-			        public void onClick(final View view) {
-				        if (mUndoListener != null) {
-					        mUndoListener.onUndo(mUndoToken);
-				        }
-				        hideUndoBar(false);
-			        }
-		        });
+		inflateUndoBar(context);
 
 		// Start hidden.
 		setVisibility(View.GONE);
+	}
+
+	protected void inflateUndoBar(Context context) {
+		LayoutInflater.from(context).inflate(R.layout.undobar, this, true);
+		mMessageView = (TextView) findViewById(R.id.undobar_message);
+		mButton = (TextView) findViewById(R.id.undobar_button);
+		mButton.setOnClickListener(
+				new View.OnClickListener() {
+					@Override
+					public void onClick(final View view) {
+						if (mUndoListener != null) {
+							mUndoListener.onUndo(mUndoToken);
+						}
+						hideUndoBar(false);
+					}
+				});
 	}
 
 	protected void setStyle(UndoBarStyle style) {
@@ -95,20 +100,25 @@ public class UndoBarController extends FrameLayout {
 			mStyle = style;
 
 			final String buttonText;
-			if(mStyle.titleRes > 0 &&
+			if(mStyle.titleRes != UndoBarStyle.IGNORE_RESOURCE &&
 				(buttonText = getResources().getString(mStyle.titleRes)) != null) {
 
 				mButton.setVisibility(View.VISIBLE);
 				mButton.setText(buttonText.toUpperCase());
-				mButton.setCompoundDrawablesWithIntrinsicBounds(getResources()
-						.getDrawable(mStyle.iconRes), null, null, null);
+
+				if(mStyle.iconRes != UndoBarStyle.IGNORE_RESOURCE) {
+					mButton.setCompoundDrawablesWithIntrinsicBounds(getResources()
+							.getDrawable(mStyle.iconRes), null, null, null);
+				}
 
 				// Change button background, but preserve the padding.
-				final int paddingLeft, paddingRight;
-				paddingLeft = mButton.getPaddingLeft();
-				paddingRight = mButton.getPaddingRight();
-				mButton.setBackgroundResource(mStyle.buttonBgRes);
-				mButton.setPadding(paddingLeft, 0, paddingRight, 0);
+				if(mStyle.buttonBgRes != UndoBarStyle.IGNORE_RESOURCE) {
+					final int paddingLeft, paddingRight;
+					paddingLeft = mButton.getPaddingLeft();
+					paddingRight = mButton.getPaddingRight();
+					mButton.setBackgroundResource(mStyle.buttonBgRes);
+					mButton.setPadding(paddingLeft, 0, paddingRight, 0);
+				}
 
 				// Show divider.
 				findViewById(R.id.undobar_divider).setVisibility(View.VISIBLE);
@@ -117,7 +127,9 @@ public class UndoBarController extends FrameLayout {
 				mButton.setVisibility(View.GONE);
 				findViewById(R.id.undobar_divider).setVisibility(View.GONE);
 			}
-			findViewById(R.id.undobar).setBackgroundResource(mStyle.bgRes);
+
+			if(mStyle.bgRes != UndoBarStyle.IGNORE_RESOURCE)
+				findViewById(R.id.undobar).setBackgroundResource(mStyle.bgRes);
 		}
 	}
 
@@ -165,7 +177,7 @@ public class UndoBarController extends FrameLayout {
 		return mFadeInAnimation;
 	}
 
-	private void hideUndoBar(final boolean immediate) {
+	protected void hideUndoBar(final boolean immediate) {
 		mHideHandler.removeCallbacks(mHideRunnable);
 		mUndoToken = null;
 

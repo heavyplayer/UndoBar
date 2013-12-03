@@ -1,16 +1,17 @@
 package com.cocosw.undobar;
 
+import android.content.res.Resources;
 import android.os.Parcel;
 import android.os.Parcelable;
-import com.cocosw.undobar.R.drawable;
 
 public class UndoBarStyle implements Parcelable {
+	public static final int IGNORE_RESOURCE = 0;
 	public static final int DEFAULT_DURATION = 5000;
 
-	int iconRes;
-	int titleRes;
-	int buttonBgRes = drawable.undobar_button;
-	int bgRes = drawable.undobar;
+	int iconRes = 0;
+	int titleRes = 0;
+	int buttonBgRes = 0;
+	int bgRes = 0;
 	long duration = DEFAULT_DURATION;
 
 	public UndoBarStyle(final int icon, final int title) {
