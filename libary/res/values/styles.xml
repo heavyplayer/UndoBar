@@ -64,6 +64,7 @@
 		<item name="android:shadowColor">#bb000000</item>
 		<item name="android:shadowRadius">2.75</item>
 		<item name="android:fontFamily">sans-serif-condensed</item>
+		<item name="android:freezesText">true</item>
 	</style>
 	<style name="UndoBarKitKat">
 		<item name="android:layout_width">match_parent</item>
